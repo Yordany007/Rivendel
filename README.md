@@ -1,2 +1,2 @@
 # Rivendel
-repo codes!
+# Be careful with the elves
