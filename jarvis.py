@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # - *- coding: utf - 8 - *-
 
-import os, sys, datetime, glob, httplib, urlparse, requests, commands, spur, subprocess, telepot, json
+import os, sys, datetime, glob, http.client, urllib.parse, requests, subprocess, spur, telepot, json
 
 # Ruta desde donde se ejecuta el script
 DIR_SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -105,11 +105,11 @@ def servicesClusters():
 		file.write("Servicios Clusters:\n\n")
 		
 		# chequear si cada cluster esta online
-		for ip, value in ips.items():
-			for hosts in value.values():
+		for ip, value in list(ips.items()):
+			for hosts in list(value.values()):
 				
 				# chequear la cabecera
-				response = commands.getstatusoutput("ping " + ip + " -c 1")[0]
+				response = subprocess.getstatusoutput("ping " + ip + " -c 1")[0]
 			
 				if response == 0:
 					line = ip + ": ONLINE"
@@ -168,8 +168,8 @@ def dataClusters():
 		file.write("------------------------------\n")
 		file.write("Espacio disponible en disco:\n\n")
 		
-		for ip, value in ips.items():
-			dirs = value.values()[0]
+		for ip, value in list(ips.items()):
+			dirs = list(value.values())[0]
 			checkDirectories(ip, user, dirs, file)
 			
 			file.write("------------------------------\n")
@@ -204,8 +204,8 @@ def gfsCluster():
 		file.write("------------------------------\n")	
 		file.write("Datos GFS descargados:\n\n")
 		
-		for ip, value in ips.items():
-			for gfs_dir in value.values():
+		for ip, value in list(ips.items()):
+			for gfs_dir in list(value.values()):
 				
 				file.write("<" + ip + ">\n\n")
 				
@@ -215,7 +215,7 @@ def gfsCluster():
 				
 				# directorios GFS
 				for line in lines:
-					gfs_folders.append((line.split(gfs_dir)[1]).rstrip('\n'))
+					gfs_folders.append(line.decode().split(gfs_dir)[1].rstrip('\n'))
 				
 				# invertir el orden de manera descendente (por fecha)
 				gfs_folders.sort(reverse=True)
@@ -225,10 +225,10 @@ def gfsCluster():
 					
 					for i in range(len(gfs_folders)):				
 						# fichero "dataready" indica que los datos del plazo fueron descargados correctamente
-						ready = gfs_dir + "/" + gfs_folders[i] + "/" + "dataready"
+						ready = (gfs_dir + gfs_folders[i]) + "/" + "dataready"
 						
 						# chequear si exite el fichero dataready
-						if commands.getstatusoutput("ssh " + user + "@" + ip + ' ls -h ' + ready + "*")[0] == 0:
+						if subprocess.getstatusoutput("ssh " + user + "@" + ip + ' ls -h ' + ready + "*")[0] == 0:
 							file.write(" " + gfs_folders[i] + "--listo\n")
 						else:
 							file.write(" " + gfs_folders[i] + "--incompleto\n")
@@ -247,7 +247,7 @@ def gfsCluster():
 # Checkear que exista la url a guardar
 def check_url(url):
     # Comprobar si la pagina esta online (codigo http 200) o si existe algun error en el servidor (codigo http 400 a 600)
-    return get_server_status_code(url) not in range(400, 600)
+    return get_server_status_code(url) not in list(range(400, 600))
 
 
 # Obtener respuesta del estatus del servidor web
@@ -285,7 +285,7 @@ def cleanDirectories(label, project_dir):
 	
 	# directorios de los datos
 	for line in lines:
-		dirs.append((line.split(project_dir)[1]).rstrip('\n'))
+		dirs.append(line.decode().split(project_dir)[1])
 		
 	# invertir el orden de manera descendente (por fecha)
 	dirs.sort(reverse=True)
@@ -309,7 +309,7 @@ def nodesCluster(ip, hosts, file):
 	line = ''
 	
 	shell = spur.SshShell(hostname=ip, username=user)
-
+	
 	for host in hosts:
 		try:
 			
@@ -346,9 +346,9 @@ def checkDirectories(ip, user, dirs, file):
 	avail = subprocess.Popen("ssh " + user + "@" + ip +" df -m --output=avail " + dirs[0], shell=True, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.readlines()[1]
 	pcent = subprocess.Popen("ssh " + user + "@" + ip + " df --output=pcent " + dirs[0], shell=True, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.readlines()[1]
 	
-	cadena = " Total: {:.1f}G\n Usado: {:.1f}G\n Disponible: {:.1f}G\n Usado%: {}\n"
+	cadena = " Total: {:.1f}G\n Usado: {:.1f}G\n Disponible: {:.1f}G\n Usado%: {}"
 	file.write("Directorio Raiz: " + dirs[0] + "\n\n")
-	file.write(cadena.format(to_gb(size), to_gb(used), to_gb(avail), pcent))
+	file.write(cadena.format(to_gb(size), to_gb(used), to_gb(avail), pcent.decode()))
 	file.write("\n")
 	
 	# reporte de los subdirectorios mas grandes (criticos)
@@ -362,8 +362,6 @@ def checkDirectories(ip, user, dirs, file):
 			cadena = "{:.1f}G \t{}\t {:.1f} %"
 			file.write(" " + cadena.format(total_subdir, dirs[i], percent_subdir))
 			file.write("\n")
-			
-	file.write("\n")
 	
 	lines = []
 	
@@ -374,8 +372,8 @@ def checkDirectories(ip, user, dirs, file):
 	lines = cmd.stdout.readlines()
 	
 	for line in lines:
-		file.write(" " + line)
-	file.write("\n\n")
+		file.write(" " + line.decode())
+	file.write("\n")
 
 
 # Convertir megabytes a gigabytes
@@ -416,7 +414,7 @@ def sendReport(report):
 def run():
 	# Hora de ejecucion del script
 	hour = datetime.datetime.now().strftime('%H')
-	
+
 	# Configuraciones proxy para el environment de crontab
 	proxyConfig()
 	
@@ -444,7 +442,7 @@ def run():
 	
 	# Enviar reporte con proxy
 	try:
-		os.system(DIR_SCRIPT_PATH + "/" + "jodo " + "python " + DIR_SCRIPT_PATH + "/" + "sendReport.py")
+		os.system(DIR_SCRIPT_PATH + "/" + "jodo " + "python3 " + DIR_SCRIPT_PATH + "/" + "sendReport.py")
 	except:
 		#print ("Fallo al publicar en Telegram")
 		with open(report, "a") as file:
